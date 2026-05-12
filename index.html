@@ -415,7 +415,11 @@ async function apiG(action,params={}){
   try{sessionStorage.setItem(k,JSON.stringify({t:Date.now(),v:data}));}catch(e){}
   return data;
 }
-function apiP(b){return fetch(API,{method:"POST",body:JSON.stringify(b)}).then(r=>r.json());}
+function apiG2(action,params={}){
+  const u=new URL(API);u.searchParams.set("action",action);
+  Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null)u.searchParams.set(k,String(v));});
+  return fetch(u.toString()).then(r=>r.json());
+}
 function clearCache(){for(const k of Object.keys(sessionStorage)){if(!k.startsWith("gjc"))sessionStorage.removeItem(k);}}
 function fmt(v){return"R$ "+Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2});}
 function pf(p){const a=Number(p["Preço (R$)"]||0),b=Number(p["Preço Promo (R$)"]||0);return b>0&&b<a?b:a;}
@@ -692,7 +696,16 @@ async function confirmOrder(){
   const d=calcD(sub),fv=freteA?freteA.valor:0,tot=Math.max(0,sub-d+fv);
   const itens=cart.map(c=>`${c.nome}${c.v?" ("+c.v+")":""} x${c.qty}`).join(" | ");
   const wpp=cfg.WHATSAPP||WPP0;
-  try{await apiP({action:"novoPedido",nomeCliente:nome,telefone:tel,itens:cart.map(c=>({nome:c.nome,variacao:c.v,qty:c.qty,preco:c.pfv})),subtotal:sub,cupom:cup?.["Código"]||"",desconto:d,tipoFrete:freteA?.tipo||"",valorFrete:fv,total:tot,formaPagamento:pagS});}catch(e){console.warn(e);}
+  try{
+    const itensStr=cart.map(c=>`${c.nome}${c.v?" ("+c.v+")":""} x${c.qty}`).join(" | ");
+    await apiG2("novoPedido",{
+      nomeCliente:nome,telefone:tel,
+      itens:itensStr,
+      subtotal:sub,cupom:cup?.["Código"]||"",desconto:d,
+      tipoFrete:freteA?.tipo||"",valorFrete:fv,
+      total:tot,formaPagamento:pagS
+    });
+  }catch(e){console.warn(e);}
   const msg=`🛒 *GJ Store*%0A%0A👤 *${encodeURIComponent(nome)}*%0A📱 ${encodeURIComponent(tel)}%0A%0A📦 ${encodeURIComponent(itens)}%0A%0A🚚 ${encodeURIComponent(freteA?.tipo||"")} | 💳 ${encodeURIComponent(pagS)}%0A💰 *Total: ${encodeURIComponent(fmt(tot))}*`;
   document.getElementById("okmsg").textContent=`Pedido de ${fmt(tot)} recebido! Guilherme entrará em contato pelo WhatsApp em breve.`;
   document.getElementById("okwpp").href=`https://wa.me/${wpp}?text=${msg}`;
